@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Riset Kalkulus – Adaptive Earphone Volume</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --bg:#e9efed; --paper:#fbfcfb; --ink:#13211f; --muted:#5b6e6a; --line:#d3deda;
+  --teal:#0f766e; --teal-soft:#dff1ee;
+  --noise:#e0502d; --deriv:#c48a00; --vol:#2d5bd6;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; padding:clamp(12px,3vw,32px);
+  background:var(--bg); color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif; line-height:1.65; font-size:16px;
+}
+.page{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:28px}
+h1,h2,h3{font-family:'Bricolage Grotesque',system-ui,sans-serif; line-height:1.2; margin:0; letter-spacing:-.01em}
+
+/* Hero */
+.hero{
+  background:var(--ink); color:#eaf3f0; border-radius:20px;
+  padding:clamp(24px,5vw,48px); position:relative; overflow:hidden;
+}
+.hero::after{ /* gelombang suara */
+  content:""; position:absolute; right:-40px; bottom:-30px; width:340px; height:160px; opacity:.28;
+  background:
+    repeating-linear-gradient(90deg,#5eead4 0 3px,transparent 3px 11px);
+  -webkit-mask:linear-gradient(0deg,transparent,#000 40%,transparent);
+          mask:linear-gradient(0deg,transparent,#000 40%,transparent);
+  clip-path:polygon(0 70%,8% 40%,16% 80%,24% 20%,32% 65%,40% 10%,48% 75%,56% 30%,64% 85%,72% 35%,80% 70%,88% 25%,100% 60%,100% 100%,0 100%);
+}
+.tag{display:inline-block; font-size:.82rem; font-weight:600; color:#99f6e4; border:1px solid #2c4a45; border-radius:999px; padding:3px 12px}
+.hero h1{font-size:clamp(1.55rem,4.2vw,2.35rem); font-weight:800; margin:14px 0 14px; max-width:20em; position:relative; z-index:1}
+.hero p{margin:0; color:#a9c0bb; font-size:.95rem; position:relative; z-index:1}
+
+/* Panel umum */
+.panel{background:var(--paper); border:1px solid var(--line); border-radius:var(--r); padding:clamp(18px,3.5vw,32px)}
+.panel>h2{font-size:1.4rem; font-weight:700; margin-bottom:6px}
+.lede{color:var(--muted); margin:0 0 22px; max-width:62ch}
+
+/* Kontrol */
+.controls{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:22px; margin-bottom:22px}
+.control label{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-weight:600; font-size:.92rem; margin-bottom:10px}
+.control output{font-family:'Bricolage Grotesque',sans-serif; font-size:1.15rem; color:var(--teal); white-space:nowrap}
+input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:6px; background:var(--line); outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:var(--teal); border:3px solid var(--paper); box-shadow:0 0 0 1px var(--teal); cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px; height:18px; border-radius:50%; background:var(--teal); border:3px solid var(--paper); cursor:pointer}
+input[type=range]:focus-visible{outline:2px solid var(--teal); outline-offset:6px}
+
+/* Ringkasan hasil */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:24px}
+.stat{background:var(--teal-soft); border-radius:10px; padding:12px 14px}
+.stat b{display:block; font-family:'Bricolage Grotesque',sans-serif; font-size:1.5rem; line-height:1.2}
+.stat span{font-size:.82rem; color:var(--muted)}
+
+/* Grafik */
+.charts{display:flex; flex-direction:column; gap:18px}
+.chart-box{border:1px solid var(--line); border-radius:12px; padding:14px 16px 8px; background:#fff}
+.chart-box h3{font-size:.98rem; font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.dot{width:10px; height:10px; border-radius:50%}
+.canvas-wrap{position:relative; height:210px}
+
+/* Teori */
+.prose h3{font-size:1.1rem; margin:26px 0 8px}
+.prose h3:first-of-type{margin-top:8px}
+.prose p{margin:0 0 12px; max-width:68ch}
+.formula{
+  background:#fff; border:1px solid var(--line); border-left:4px solid var(--teal);
+  border-radius:10px; padding:6px 14px; margin:16px 0; overflow-x:auto; text-align:center;
+}
+.formula .katex-display{margin:.7em 0}
+
+/* Tabel */
+.table-scroll{overflow-x:auto; border:1px solid var(--line); border-radius:12px; margin-top:16px}
+table{width:100%; border-collapse:collapse; min-width:620px; background:#fff}
+th,td{padding:14px 16px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); font-size:.94rem}
+tr:last-child td{border-bottom:0}
+th{background:#f0f5f3; font-weight:600}
+td:first-child{white-space:nowrap}
+.pill{display:inline-block; font-size:.78rem; font-weight:600; padding:2px 10px; border-radius:999px; margin-top:6px}
+.up{background:#fde4dc; color:#a3361a}
+.down{background:#dce6fb; color:#1f3f9c}
+.flat{background:#e3ece9; color:#3c524d}
+
+/* Kesimpulan */
+.conclusion ol{margin:0; padding-left:1.2em; display:flex; flex-direction:column; gap:12px}
+.conclusion li::marker{color:var(--teal); font-weight:700}
+
+footer{text-align:center; color:var(--muted); font-size:.85rem; padding:4px 0 12px}
+
+@media (max-width:560px){
+  .hero::after{display:none}
+  .canvas-wrap{height:190px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <span class="tag">Mini Riset Kalkulus Diferensial</span>
+    <h1>Penyesuaian Volume Otomatis Berbasis Laju Perubahan Kebisingan Pada Aplikasi Audio/Earphone</h1>
+    <p>Pangeran Ahmad Khalid Bolahruz</p>
+    <p>Program Studi Ilmu Komputer, Universitas Negeri Medan (UNIMED)
+    <br>Aplikasi turunan fungsi dalam teknologi audio sehari-hari</p>
+  </header>
+
+  <section class="panel">
+    <h2>1. Simulasi Real-Time</h2>
+    <p class="lede">Geser kedua slider untuk melihat bagaimana kebisingan, turunannya, dan volume earphone saling memengaruhi.</p>
+
+    <div class="controls">
+      <div class="control">
+        <label for="thresholdSlider">Ambang batas turunan <output id="thresholdVal">5 dB/s</output></label>
+        <input type="range" id="thresholdSlider" min="1" max="15" value="5" step="1">
+      </div>
+      <div class="control">
+        <label for="peakNoiseSlider">Puncak kebisingan $N_{\max}$ <output id="peakVal">85 dB</output></label>
+        <input type="range" id="peakNoiseSlider" min="60" max="110" value="85" step="5">
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="sMax">0</b><span>laju naik tertinggi (dB/s)</span></div>
+      <div class="stat"><b id="sUp">0</b><span>kali volume dinaikkan</span></div>
+      <div class="stat"><b id="sDown">0</b><span>kali volume diturunkan</span></div>
+      <div class="stat"><b id="sFinal">0%</b><span>volume akhir</span></div>
+    </div>
+
+    <div class="charts">
+      <div class="chart-box">
+        <h3><span class="dot" style="background:var(--noise)"></span>Kebisingan lingkungan $N(t)$</h3>
+        <div class="canvas-wrap"><canvas id="chartNoise"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h3><span class="dot" style="background:var(--deriv)"></span>Laju perubahan $\frac{dN}{dt}$ dan ambang batas</h3>
+        <div class="canvas-wrap"><canvas id="chartDerivative"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h3><span class="dot" style="background:var(--vol)"></span>Volume earphone $V(t)$</h3>
+        <div class="canvas-wrap"><canvas id="chartVolume"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel prose">
+    <h2>2. Landasan Teori dan Pemodelan</h2>
+
+    <h3>A. Mengapa turunan, bukan hanya nilai desibel?</h3>
+    <p>Pendekatan konvensional hanya membaca desibel absolut: bila lingkungan bising ($N > 70\text{ dB}$), volume langsung dinaikkan. Cara ini terlambat merespons lonjakan mendadak seperti klakson atau kereta lewat, dan perubahan volumenya terasa kaku.</p>
+    <p>Dengan kalkulus diferensial, sistem membaca <strong>laju perubahan kebisingan terhadap waktu</strong>, yaitu $\frac{dN}{dt}$. Lonjakan suara terdeteksi saat sedang terjadi, sehingga volume bisa disesuaikan secara mulus.</p>
+
+    <div class="formula">
+      $$N'(t)=\frac{dN}{dt}=\lim_{\Delta t\to 0}\frac{N(t+\Delta t)-N(t)}{\Delta t}$$
+    </div>
+
+    <h3>B. Pendekatan diskrit untuk ilmu komputer</h3>
+    <p>Mikrofon merekam data secara diskrit pada setiap interval $\Delta t$. Karena itu limit turunan diganti dengan <strong>selisih mundur (difference quotient)</strong>:</p>
+
+    <div class="formula">
+      $$\frac{dN}{dt}\approx\frac{N(t)-N(t-\Delta t)}{\Delta t}$$
+    </div>
+
+    <p>Untuk $\Delta t = 1\text{ detik}$, turunan pertama cukup dihitung sebagai $N(t)-N(t-1)$, yaitu selisih desibel detik ini dengan detik sebelumnya.</p>
+  </section>
+
+  <section class="panel">
+    <h2>3. Logika Keputusan (If-Else)</h2>
+    <p class="lede">Nilai $\frac{dN}{dt}$ menjadi masukan bagi algoritma yang menentukan volume $V(t)$.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Kondisi turunan</th><th>Situasi lingkungan</th><th>Aksi pada volume</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$\frac{dN}{dt} > +T$<br><span class="pill up">positif tinggi</span></td>
+            <td>Lonjakan kebisingan mendadak, misalnya kendaraan keras lewat.</td>
+            <td><strong>Naikkan volume 10%</strong> untuk mengimbangi suara luar.</td>
+          </tr>
+          <tr>
+            <td>$\frac{dN}{dt} < -T$<br><span class="pill down">negatif tinggi</span></td>
+            <td>Suara luar mendadak tenang kembali.</td>
+            <td><strong>Turunkan volume 10%</strong> bertahap agar pendengaran terlindungi.</td>
+          </tr>
+          <tr>
+            <td>$-T \le \frac{dN}{dt} \le +T$<br><span class="pill flat">mendekati nol</span></td>
+            <td>Lingkungan stabil, baik sepi maupun bising konstan.</td>
+            <td><strong>Pertahankan volume:</strong> $V(t)=V(t-1)$.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lede" style="margin:14px 0 0">Keterangan: $T$ adalah ambang batas (threshold) yang diatur pada slider.</p>
+  </section>
+
+  <section class="panel conclusion">
+    <h2 style="margin-bottom:16px">4. Kesimpulan</h2>
+    <ol>
+      <li><strong>Integrasi lintas disiplin.</strong> Turunan pertama dari kalkulus diferensial dapat diterapkan langsung pada algoritma pemrosesan audio real-time dalam ilmu komputer.</li>
+      <li><strong>Sistem lebih responsif.</strong> Memakai $\frac{dN}{dt}$ membuat sistem bereaksi lebih cepat daripada sekadar ambang batas desibel statis.</li>
+      <li><strong>Pengalaman pengguna lebih baik.</strong> Volume yang mengikuti laju perubahan suara mencegah lonjakan yang mengejutkan pengguna.</li>
+    </ol>
+  </section>
+
+  <footer>Mini Riset Kalkulus Diferensial · UNIMED</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const COLORS = {noise:'#e0502d', deriv:'#c48a00', vol:'#2d5bd6', grid:'#e3ebe8', text:'#5b6e6a'};
+let c1, c2, c3;
+
+function simulate(){
+  const T = parseFloat($('thresholdSlider').value);
+  const peak = parseFloat($('peakNoiseSlider').value);
+  const time = Array.from({length:21}, (_, i) => i);
+
+  const noise = time.map(t => {
+    if (t <= 5) return 40;
+    if (t <= 10) return 40 + (peak - 40) * ((t - 5) / 5);
+    if (t <= 15) return peak;
+    return peak - (peak - 40) * ((t - 15) / 5);
+  });
+
+  const deriv = noise.map((n, i) => i === 0 ? 0 : n - noise[i - 1]);
+
+  const vol = [30];
+  let ups = 0, downs = 0;
+  for (let i = 1; i < time.length; i++){
+    let v = vol[i - 1];
+    if (deriv[i] > T){ v = Math.min(v + 10, 100); ups++; }
+    else if (deriv[i] < -T){ v = Math.max(v - 10, 0); downs++; }
+    vol.push(v);
+  }
+  return {T, peak, time, noise, deriv, vol, ups, downs};
+}
+
+function baseOptions(yTitle, extra = {}){
+  return {
+    responsive:true, maintainAspectRatio:false, animation:{duration:250},
+    interaction:{mode:'index', intersect:false},
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:COLORS.grid}, ticks:{color:COLORS.text}, title:{display:true, text:'Waktu (s)', color:COLORS.text}},
+      y:{grid:{color:COLORS.grid}, ticks:{color:COLORS.text}, title:{display:true, text:yTitle, color:COLORS.text}, ...extra}
+    }
+  };
+}
+
+function initCharts(){
+  Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+  const d = simulate();
+
+  c1 = new Chart($('chartNoise'), {
+    type:'line',
+    data:{labels:d.time, datasets:[{data:d.noise, borderColor:COLORS.noise, backgroundColor:'rgba(224,80,45,.12)', fill:true, tension:.2, pointRadius:2}]},
+    options:baseOptions('dB', {min:30, max:115})
+  });
+
+  c2 = new Chart($('chartDerivative'), {
+    type:'line',
+    data:{labels:d.time, datasets:[
+      {label:'dN/dt', data:d.deriv, borderColor:COLORS.deriv, backgroundColor:'rgba(196,138,0,.12)', fill:true, pointRadius:2},
+      {label:'+T', data:Array(21).fill(d.T), borderColor:'#8aa09b', borderDash:[6,5], borderWidth:1.5, pointRadius:0},
+      {label:'−T', data:Array(21).fill(-d.T), borderColor:'#8aa09b', borderDash:[6,5], borderWidth:1.5, pointRadius:0}
+    ]},
+    options:baseOptions('dB/s', {min:-25, max:25})
+  });
+
+  c3 = new Chart($('chartVolume'), {
+    type:'line',
+    data:{labels:d.time, datasets:[{data:d.vol, borderColor:COLORS.vol, backgroundColor:'rgba(45,91,214,.12)', fill:true, stepped:true, pointRadius:2}]},
+    options:baseOptions('%', {min:0, max:100})
+  });
+
+  render(d);
+}
+
+function render(d){
+  $('thresholdVal').textContent = d.T + ' dB/s';
+  $('peakVal').textContent = d.peak + ' dB';
+  $('sMax').textContent = Math.max(...d.deriv).toFixed(0);
+  $('sUp').textContent = d.ups;
+  $('sDown').textContent = d.downs;
+  $('sFinal').textContent = d.vol[d.vol.length - 1] + '%';
+}
+
+function updateSimulation(){
+  const d = simulate();
+  c1.data.datasets[0].data = d.noise;
+  c2.data.datasets[0].data = d.deriv;
+  c2.data.datasets[1].data = Array(21).fill(d.T);
+  c2.data.datasets[2].data = Array(21).fill(-d.T);
+  c3.data.datasets[0].data = d.vol;
+  [c1, c2, c3].forEach(c => c.update());
+  render(d);
+}
+
+window.addEventListener('load', () => {
+  initCharts();
+  $('thresholdSlider').addEventListener('input', updateSimulation);
+  $('peakNoiseSlider').addEventListener('input', updateSimulation);
+  if (window.renderMathInElement){
+    renderMathInElement(document.body, {
+      delimiters:[
+        {left:'$$', right:'$$', display:true},
+        {left:'$', right:'$', display:false}
+      ],
+      throwOnError:false
+    });
+  }
+});
+</script>
+</body>
+</html>
